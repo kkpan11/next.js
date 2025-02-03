@@ -8,6 +8,7 @@ use turbopack_core::{
         ChunkingTypeOption,
     },
     module::Module,
+    module_graph::ModuleGraph,
     reference::ModuleReference,
     resolve::{ModulePart, ModuleResolveResult},
 };
@@ -112,12 +113,13 @@ impl CodeGenerateable for EcmascriptModulePartReference {
     #[turbo_tasks::function]
     async fn code_generation(
         self: Vc<Self>,
+        module_graph: Vc<ModuleGraph>,
         chunking_context: Vc<Box<dyn ChunkingContext>>,
     ) -> Result<Vc<CodeGeneration>> {
         let referenced_asset = ReferencedAsset::from_resolve_result(self.resolve_reference());
         let referenced_asset = referenced_asset.await?;
         let ident = referenced_asset
-            .get_ident()
+            .get_ident(module_graph, chunking_context)
             .await?
             .context("part module reference should have an ident")?;
 
@@ -125,7 +127,7 @@ impl CodeGenerateable for EcmascriptModulePartReference {
             bail!("part module reference should have an module reference");
         };
         let id = module
-            .as_chunk_item(Vc::upcast(chunking_context))
+            .as_chunk_item(module_graph, Vc::upcast(chunking_context))
             .id()
             .await?;
 

@@ -27,6 +27,7 @@ import { hasNextSupport } from '../server/ci-info'
 import { transpileConfig } from '../build/next-config-ts/transpile-config'
 import { dset } from '../shared/lib/dset'
 import { normalizeZodErrors } from '../shared/lib/zod'
+import { HTML_LIMITED_BOT_UA_RE_STRING } from '../shared/lib/router/utils/is-bot'
 
 export { normalizeConfig } from './config-shared'
 export type { DomainLocale, NextConfig } from './config-shared'
@@ -437,6 +438,13 @@ function assignDefaults(
       }
       images.loaderFile = absolutePath
     }
+  }
+
+  // TODO(jiwon): remove once we've made new UI default
+  // Enable reactOwnerStack when newDevOverlay is enabled to have
+  // better call stack output in the new UI.
+  if (result.experimental?.newDevOverlay) {
+    result.experimental.reactOwnerStack = true
   }
 
   warnCustomizedOption(
@@ -1004,6 +1012,18 @@ function assignDefaults(
     ]),
   ]
 
+  if (!result.experimental.htmlLimitedBots) {
+    // @ts-expect-error: override the htmlLimitedBots with default string, type covert: RegExp -> string
+    result.experimental.htmlLimitedBots = HTML_LIMITED_BOT_UA_RE_STRING
+  }
+
+  // "use cache" was originally implicitly enabled with the dynamicIO flag, so
+  // we transfer the value for dynamicIO to the explicit useCache flag to ensure
+  // backwards compatibility.
+  if (result.experimental.useCache === undefined) {
+    result.experimental.useCache = result.experimental.dynamicIO
+  }
+
   return result
 }
 
@@ -1220,6 +1240,12 @@ export default async function loadConfig(
         )
         userConfig.experimental.useLightningcss = false
       }
+    }
+
+    // serialize the regex config into string
+    if (userConfig.experimental?.htmlLimitedBots instanceof RegExp) {
+      userConfig.experimental.htmlLimitedBots =
+        userConfig.experimental.htmlLimitedBots.source
     }
 
     onLoadUserConfig?.(userConfig)
